@@ -2,13 +2,27 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { protect } = require('../middleware/authMiddleware');
 const { adminOnly } = require('../middleware/roleMiddleware');
 
 
-const { protect } = require('../middleware/authMiddleware');
+
 
 
 const router = express.Router();
+// Get all users (Admin only)
+router.get('/', protect, adminOnly, async (req, res) => {
+  try {
+    const users = await User.find().select('_id name email role');
+
+    res.status(200).json({
+      users
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+});
+
 
 // Admin creates user
 router.post('/create-user', protect, adminOnly, async (req, res) => {
@@ -44,6 +58,29 @@ router.post('/create-user', protect, adminOnly, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to create user' });
+  }
+});
+
+//Delete user
+router.delete('/delete-user/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    // prevent self-delete
+    if (req.user._id.toString() === userId) {
+      return res.status(400).json({ message: 'Admin cannot delete himself' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    await user.deleteOne();
+
+    res.status(200).json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to delete user' });
   }
 });
 
